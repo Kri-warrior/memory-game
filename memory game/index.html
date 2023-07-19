@@ -2,221 +2,339 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Flappy Bird</title>
+    <title>🧠 Memory Game in JavaScript</title>
     <style>
-      @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+      * {
+        font-family: sans-serif;
+      }
 
-body {
-  margin: 0;
-  text-align: center;
-  font-family: 'Press Start 2P', cursive;
-  user-select: none;
-}
-header {
-  margin: 0 auto;
-  width: 431px;
-}
-h1 {
-  background: url("https://i.ibb.co/Q9yv5Jk/flappy-bird-set.png") 0% 340px;
-  padding: 1.2rem 0;
-  margin: 0;
-}
-.score-container {
-  display: flex;
-  justify-content: space-between;
-  padding: 8px 6px;
-  background: #5EE270;
-}
+      html {
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(
+          325deg,
+          #6f00fc 0%,
+          #fc7900 50%,
+          #fcc700 100%
+        );
+        font-family: Fredoka;
+      }
+
+      .game {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+      }
+
+      .controls {
+        display: flex;
+        gap: 20px;
+        margin-bottom: 20px;
+      }
+
+      button {
+        background: #282a3a;
+        color: #fff;
+        border-radius: 5px;
+        padding: 10px 20px;
+        border: 0;
+        cursor: pointer;
+        font-family: Fredoka;
+        font-size: 18pt;
+      }
+
+      .disabled {
+        color: #757575;
+      }
+
+      .stats {
+        color: #fff;
+        font-size: 14pt;
+      }
+
+      .board-container {
+        position: relative;
+      }
+
+      .board,
+      .win {
+        border-radius: 5px;
+        box-shadow: 0 25px 50px rgb(33 33 33 / 25%);
+        background: linear-gradient(
+          135deg,
+          #6f00fc 0%,
+          #fc7900 50%,
+          #fcc700 100%
+        );
+        transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        backface-visibility: hidden;
+      }
+
+      .board {
+        padding: 20px;
+        display: grid;
+        grid-template-columns: repeat(4, auto);
+        grid-gap: 20px;
+      }
+
+      .board-container.flipped .board {
+        transform: rotateY(180deg) rotateZ(50deg);
+      }
+
+      .board-container.flipped .win {
+        transform: rotateY(0) rotateZ(0);
+      }
+
+      .card {
+        position: relative;
+        width: 100px;
+        height: 100px;
+        cursor: pointer;
+      }
+
+      .card-front,
+      .card-back {
+        position: absolute;
+        border-radius: 5px;
+        width: 100%;
+        height: 100%;
+        background: #282a3a;
+        transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        backface-visibility: hidden;
+      }
+
+      .card-back {
+        transform: rotateY(180deg) rotateZ(50deg);
+        font-size: 28pt;
+        user-select: none;
+        text-align: center;
+        line-height: 100px;
+        background: #fdf8e6;
+      }
+
+      .card.flipped .card-front {
+        transform: rotateY(180deg) rotateZ(50deg);
+      }
+
+      .card.flipped .card-back {
+        transform: rotateY(0) rotateZ(0);
+      }
+
+      .win {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        text-align: center;
+        background: #fdf8e6;
+        transform: rotateY(180deg) rotateZ(50deg);
+      }
+
+      .win-text {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 21pt;
+        color: #282a3a;
+      }
+
+      .highlight {
+        color: #6f00fc;
+      }
     </style>
   </head>
   <body>
-    <header>
-      <h1>Flappy Bird</h1>
-      <div class="score-container">
-        <div id="bestScore"></div>
-        <div id="currentScore"></div>
+    <div class="game">
+      <div class="controls">
+        <button>Start</button>
+        <div class="stats">
+          <div class="moves">0 moves</div>
+          <div class="timer">time: 0 sec</div>
+        </div>
       </div>
-    </header>
-
-    <canvas id="canvas" width="431" height="768"></canvas>
+      <div class="board-container">
+        <div class="board" data-dimension="4"></div>
+        <div class="win">You won!</div>
+      </div>
+    </div>
 
     <script>
-      const canvas = document.getElementById("canvas");
-      const ctx = canvas.getContext("2d");
-      const img = new Image();
-      img.src = "https://i.ibb.co/Q9yv5Jk/flappy-bird-set.png";
-
-      // general settings
-      let gamePlaying = false;
-      const gravity = 0.5;
-      const speed = 5.2;
-      const size = [51, 36];
-      const jump = -11.5;
-      const cTenth = canvas.width / 10;
-
-      let index = 0,
-        bestScore = 0,
-        flight,
-        flyHeight,
-        currentScore,
-        pipe;
-
-      // pipe settings
-      const pipeWidth = 78;
-      const pipeGap = 270;
-      const pipeLoc = () =>
-        Math.random() * (canvas.height - (pipeGap + pipeWidth) - pipeWidth) +
-        pipeWidth;
-
-      const setup = () => {
-        currentScore = 0;
-        flight = jump;
-
-        // set initial flyHeight (middle of screen - size of the bird)
-        flyHeight = canvas.height / 3 - size[1] / 2;
-
-        // setup first 3 pipes
-        pipes = Array(3)
-          .fill()
-          .map((a, i) => [canvas.width + i * (pipeGap + pipeWidth), pipeLoc()]);
+      const selectors = {
+        boardContainer: document.querySelector(".board-container"),
+        board: document.querySelector(".board"),
+        moves: document.querySelector(".moves"),
+        timer: document.querySelector(".timer"),
+        start: document.querySelector("button"),
+        win: document.querySelector(".win"),
       };
 
-      const render = () => {
-        // make the pipe and bird moving
-        index++;
-
-        // ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        // background first part
-        ctx.drawImage(
-          img,
-          0,
-          0,
-          canvas.width,
-          canvas.height,
-          -((index * (speed / 2)) % canvas.width) + canvas.width,
-          0,
-          canvas.width,
-          canvas.height
-        );
-        // background second part
-        ctx.drawImage(
-          img,
-          0,
-          0,
-          canvas.width,
-          canvas.height,
-          -(index * (speed / 2)) % canvas.width,
-          0,
-          canvas.width,
-          canvas.height
-        );
-
-        // pipe display
-        if (gamePlaying) {
-          pipes.map((pipe) => {
-            // pipe moving
-            pipe[0] -= speed;
-
-            // top pipe
-            ctx.drawImage(
-              img,
-              432,
-              588 - pipe[1],
-              pipeWidth,
-              pipe[1],
-              pipe[0],
-              0,
-              pipeWidth,
-              pipe[1]
-            );
-            // bottom pipe
-            ctx.drawImage(
-              img,
-              432 + pipeWidth,
-              108,
-              pipeWidth,
-              canvas.height - pipe[1] + pipeGap,
-              pipe[0],
-              pipe[1] + pipeGap,
-              pipeWidth,
-              canvas.height - pipe[1] + pipeGap
-            );
-
-            // give 1 point & create new pipe
-            if (pipe[0] <= -pipeWidth) {
-              currentScore++;
-              // check if it's the best score
-              bestScore = Math.max(bestScore, currentScore);
-
-              // remove & create new pipe
-              pipes = [
-                ...pipes.slice(1),
-                [pipes[pipes.length - 1][0] + pipeGap + pipeWidth, pipeLoc()],
-              ];
-              console.log(pipes);
-            }
-
-            // if hit the pipe, end
-            if (
-              [
-                pipe[0] <= cTenth + size[0],
-                pipe[0] + pipeWidth >= cTenth,
-                pipe[1] > flyHeight || pipe[1] + pipeGap < flyHeight + size[1],
-              ].every((elem) => elem)
-            ) {
-              gamePlaying = false;
-              setup();
-            }
-          });
-        }
-        // draw bird
-        if (gamePlaying) {
-          ctx.drawImage(
-            img,
-            432,
-            Math.floor((index % 9) / 3) * size[1],
-            ...size,
-            cTenth,
-            flyHeight,
-            ...size
-          );
-          flight += gravity;
-          flyHeight = Math.min(flyHeight + flight, canvas.height - size[1]);
-        } else {
-          ctx.drawImage(
-            img,
-            432,
-            Math.floor((index % 9) / 3) * size[1],
-            ...size,
-            canvas.width / 2 - size[0] / 2,
-            flyHeight,
-            ...size
-          );
-          flyHeight = canvas.height / 2 - size[1] / 2;
-          // text accueil
-          ctx.fillText(`Best score : ${bestScore}`, 85, 245);
-          ctx.fillText("Click to play", 90, 535);
-          ctx.font = "bold 30px courier";
-        }
-
-        document.getElementById("bestScore").innerHTML = `Best : ${bestScore}`;
-        document.getElementById(
-          "currentScore"
-        ).innerHTML = `Current : ${currentScore}`;
-
-        // tell the browser to perform anim
-        window.requestAnimationFrame(render);
+      const state = {
+        gameStarted: false,
+        flippedCards: 0,
+        totalFlips: 0,
+        totalTime: 0,
+        loop: null,
       };
 
-      // launch setup
-      setup();
-      img.onload = render;
+      const shuffle = (array) => {
+        const clonedArray = [...array];
 
-      // start game
-      document.addEventListener("click", () => (gamePlaying = true));
-      window.onclick = () => (flight = jump);
+        for (let index = clonedArray.length - 1; index > 0; index--) {
+          const randomIndex = Math.floor(Math.random() * (index + 1));
+          const original = clonedArray[index];
+
+          clonedArray[index] = clonedArray[randomIndex];
+          clonedArray[randomIndex] = original;
+        }
+
+        return clonedArray;
+      };
+
+      const pickRandom = (array, items) => {
+        const clonedArray = [...array];
+        const randomPicks = [];
+
+        for (let index = 0; index < items; index++) {
+          const randomIndex = Math.floor(Math.random() * clonedArray.length);
+
+          randomPicks.push(clonedArray[randomIndex]);
+          clonedArray.splice(randomIndex, 1);
+        }
+
+        return randomPicks;
+      };
+
+      const generateGame = () => {
+        const dimensions = selectors.board.getAttribute("data-dimension");
+
+        if (dimensions % 2 !== 0) {
+          throw new Error("The dimension of the board must be an even number.");
+        }
+
+        const emojis = [
+          "🥔",
+          "🍒",
+          "🥑",
+          "🌽",
+          "🥕",
+          "🍇",
+          "🍉",
+          "🍌",
+          "🥭",
+          "🍍",
+        ];
+        const picks = pickRandom(emojis, (dimensions * dimensions) / 2);
+        const items = shuffle([...picks, ...picks]);
+        const cards = `
+        <div class="board" style="grid-template-columns: repeat(${dimensions}, auto)">
+            ${items
+              .map(
+                (item) => `
+                <div class="card">
+                    <div class="card-front"></div>
+                    <div class="card-back">${item}</div>
+                </div>
+            `
+              )
+              .join("")}
+       </div>
+    `;
+
+        const parser = new DOMParser().parseFromString(cards, "text/html");
+
+        selectors.board.replaceWith(parser.querySelector(".board"));
+      };
+
+      const startGame = () => {
+        state.gameStarted = true;
+        selectors.start.classList.add("disabled");
+
+        state.loop = setInterval(() => {
+          state.totalTime++;
+
+          selectors.moves.innerText = `${state.totalFlips} moves`;
+          selectors.timer.innerText = `time: ${state.totalTime} sec`;
+        }, 1000);
+      };
+
+      const flipBackCards = () => {
+        document.querySelectorAll(".card:not(.matched)").forEach((card) => {
+          card.classList.remove("flipped");
+        });
+
+        state.flippedCards = 0;
+      };
+
+      const flipCard = (card) => {
+        state.flippedCards++;
+        state.totalFlips++;
+
+        if (!state.gameStarted) {
+          startGame();
+        }
+
+        if (state.flippedCards <= 2) {
+          card.classList.add("flipped");
+        }
+
+        if (state.flippedCards === 2) {
+          const flippedCards = document.querySelectorAll(
+            ".flipped:not(.matched)"
+          );
+
+          if (flippedCards[0].innerText === flippedCards[1].innerText) {
+            flippedCards[0].classList.add("matched");
+            flippedCards[1].classList.add("matched");
+          }
+
+          setTimeout(() => {
+            flipBackCards();
+          }, 1000);
+        }
+
+        // If there are no more cards that we can flip, we won the game
+        if (!document.querySelectorAll(".card:not(.flipped)").length) {
+          setTimeout(() => {
+            selectors.boardContainer.classList.add("flipped");
+            selectors.win.innerHTML = `
+                <span class="win-text">
+                    You won!<br />
+                    with <span class="highlight">${state.totalFlips}</span> moves<br />
+                    under <span class="highlight">${state.totalTime}</span> seconds
+                </span>
+            `;
+
+            clearInterval(state.loop);
+          }, 1000);
+        }
+      };
+
+      const attachEventListeners = () => {
+        document.addEventListener("click", (event) => {
+          const eventTarget = event.target;
+          const eventParent = eventTarget.parentElement;
+
+          if (
+            eventTarget.className.includes("card") &&
+            !eventParent.className.includes("flipped")
+          ) {
+            flipCard(eventParent);
+          } else if (
+            eventTarget.nodeName === "BUTTON" &&
+            !eventTarget.className.includes("disabled")
+          ) {
+            startGame();
+          }
+        });
+      };
+
+      generateGame();
+      attachEventListeners();
     </script>
   </body>
 </html>
